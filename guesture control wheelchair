@@ -1,0 +1,150 @@
+#include <SoftwareSerial.h>
+
+// Motor Driver pins
+const int motorLeftForward = 8;
+const int motorLeftBackward = 9;
+const int motorRightForward = 10;
+const int motorRightBackward = 11;
+const int enableA = 5;
+const int enableB = 6;
+
+// Ultrasonic Sensor Pins
+const int trigPin = 7;
+const int echoPin = 4;
+
+// Bluetooth control variables
+char bluetoothData;
+
+void setup() {
+// Initialize motor driver pins
+pinMode(motorLeftForward, OUTPUT);
+pinMode(motorLeftBackward, OUTPUT);
+pinMode(motorRightForward, OUTPUT);
+pinMode(motorRightBackward, OUTPUT);
+pinMode(enableA, OUTPUT);
+pinMode(enableB, OUTPUT);
+
+// Initialize Ultrasonic Sensor Pins
+pinMode(trigPin, OUTPUT);
+pinMode(echoPin, INPUT);
+
+// Initialize Bluetooth communication
+Serial.begin(9600);
+
+// Start Serial for debugging
+Serial.begin(9600);
+
+Serial.println("Setup Complete");
+}
+
+long getDistance() {
+long duration, distance;
+digitalWrite(trigPin, LOW);
+delayMicroseconds(2);
+digitalWrite(trigPin, HIGH);
+delayMicroseconds(10);
+digitalWrite(trigPin, LOW);
+duration = pulseIn(echoPin, HIGH);
+if (duration == 0) {
+// No echo received, return a large value indicating no obstacle
+return 9999;
+}
+distance = (duration / 2) / 29.1; // Convert to cm
+return distance;
+}
+
+long getFilteredDistance() {
+const int numReadings = 5;
+long sum = 0;
+for (int i = 0; i < numReadings; i++) {
+sum += getDistance();
+delay(50); // Add a small delay between readings
+}
+return sum / numReadings;
+}
+
+void loop() {
+// Bluetooth control
+if (Serial.available() > 0) {
+bluetoothData = Serial.read();
+controlMotors(bluetoothData);
+}
+
+// Get filtered distance measurement
+long distance = getFilteredDistance();
+
+// Debugging: Print distance to Serial Monitor
+Serial.print("Distance: ");
+Serial.println(distance);
+
+// Send distance data via Bluetooth
+Serial.print("Distance: ");
+Serial.print(distance);
+Serial.println(" cm");
+
+// Example: Stop the car if an obstacle is closer than 20 cm
+if (distance >= 0 && distance < 20) {
+moveCar("STOP");
+}
+
+delay(100); // Add a small delay to avoid spamming the sensor
+}
+
+void moveCar(String direction) {
+if (direction == "FORWARD") {
+digitalWrite(motorLeftForward, HIGH);
+digitalWrite(motorLeftBackward, LOW);
+digitalWrite(motorRightForward, HIGH);
+digitalWrite(motorRightBackward, LOW);
+analogWrite(enableA, 255); // full speed
+analogWrite(enableB, 255); // full speed
+} else if (direction == "BACKWARD") {
+digitalWrite(motorLeftForward, LOW);
+digitalWrite(motorLeftBackward, HIGH);
+digitalWrite(motorRightForward, LOW);
+digitalWrite(motorRightBackward, HIGH);
+analogWrite(enableA, 255); // full speed
+analogWrite(enableB, 255); // full speed
+} else if (direction == "LEFT") {
+digitalWrite(motorLeftForward, LOW);
+digitalWrite(motorLeftBackward, HIGH);
+digitalWrite(motorRightForward, HIGH);
+digitalWrite(motorRightBackward, LOW);
+analogWrite(enableA, 255); // full speed
+analogWrite(enableB, 255); // full speed
+} else if (direction == "RIGHT") {
+digitalWrite(motorLeftForward, HIGH);
+digitalWrite(motorLeftBackward, LOW);
+digitalWrite(motorRightForward, LOW);
+digitalWrite(motorRightBackward, HIGH);
+analogWrite(enableA, 255); // full speed
+analogWrite(enableB, 255); // full speed
+} else if (direction == "STOP") {
+digitalWrite(motorLeftForward, LOW);
+digitalWrite(motorLeftBackward, LOW);
+digitalWrite(motorRightForward, LOW);
+digitalWrite(motorRightBackward, LOW);
+analogWrite(enableA, 0); // stop
+analogWrite(enableB, 0); // stop
+}
+}
+
+void controlMotors(char command) {
+switch (command) {
+case 'F': // Move forward
+moveCar("FORWARD");
+break;
+case 'B': // Move backward
+moveCar("BACKWARD");
+break;
+case 'L': // Turn left
+moveCar("LEFT");
+break;
+case 'R': // Turn right
+moveCar("RIGHT");
+break;
+case 'S': // Stop
+moveCar("STOP");
+break;
+}
+}
